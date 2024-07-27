@@ -1,0 +1,146 @@
+This guide explains how to build a web-controlled surveillance robotic car using a Raspberry Pi, a USB webcam, and DC motors with a robot chassis. This setup allows live video feed streaming and robot control through a web browser. Here are the key components and steps:
+
+### Components
+- Raspberry Pi
+- USB webcam
+- Robot chassis with two DC motors
+- Motor driver IC (L293D)
+- Power bank
+- Breadboard or PCB for connections
+
+### Software Requirements
+- Raspbian Jessie OS
+- Motion (for video streaming)
+- Flask (for web server)
+- Python and relevant libraries (RPi.GPIO)
+
+### Steps to Build
+
+#### 1. Setting Up the Raspberry Pi
+1. **Update the Raspbian OS:**
+   ```bash
+   sudo apt-get update
+   ```
+2. **Install Motion for Video Streaming:**
+   ```bash
+   sudo apt-get install motion
+   ```
+3. **Configure Motion:**
+   - Edit `/etc/default/motion`:
+     ```bash
+     sudo nano /etc/default/motion
+     ```
+     Set `start_motion_daemon` to `yes`.
+   - Set permissions:
+     ```bash
+     sudo chown motion:motion /var/lib/motion/
+     ```
+   - Edit `/etc/motion/motion.conf`:
+     ```bash
+     sudo nano /etc/motion/motion.conf
+     ```
+     Set `stream_localhost` to `off`.
+   - Restart Motion:
+     ```bash
+     sudo /etc/init.d/motion restart
+     ```
+   - Check live feed at `http://<Pi_IP>:8081`.
+
+#### 2. Setting Up Flask for Web Control
+1. **Install Flask:**
+   ```bash
+   pip install Flask
+   ```
+2. **Create HTML for Control Interface:**
+   Save the following code as `robot.html` in a `templates` folder:
+   ```html
+   <html>
+   <head>
+   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+   </head>
+   <body>
+   <img src="http://<Pi_IP>:8081" />
+   <div style="float:right">
+   <div style=" height:400px; width:300px; float:right;">
+   <center>
+   <h1>Surveillance Robot</h1>
+   <a href="#" id="up" style="font-size:30px;text-decoration:none;">Forward</a><br><br></center>
+   <a href="#" id="left" style="font-size:30px;text-decoration:none;">Left</a>
+   <a href="#" id="right" style="font-size:30px; text-decoration:none;">Right</a><br><br>
+   <center><a href="#" id="down" style="font-size:30px;text-decoration:none;">Backward</a></center>
+   </div>
+   <script>
+   $(document).ready(function(){
+       $("#down").on("mousedown", function() { $.get('/down_side'); }).on('mouseup', function() { $.get('/stop'); });
+       $("#up").on("mousedown", function() { $.get('/up_side'); }).on('mouseup', function() { $.get('/stop'); });
+       $("#left").on("mousedown", function() { $.get('/left_side'); }).on('mouseup', function() { $.get('/stop'); });
+       $("#right").on("mousedown", function() { $.get('/right_side'); }).on('mouseup', function() { $.get('/stop'); });
+   });
+   </script>
+   </body>
+   </html>
+   ```
+
+3. **Create Python Script for Robot Control:**
+   Save the following code as `robot.py`:
+   ```python
+   from flask import Flask, render_template
+   import RPi.GPIO as GPIO
+
+   app = Flask(__name__)
+
+   m11, m12, m21, m22 = 18, 23, 24, 25
+
+   GPIO.setwarnings(False)
+   GPIO.setmode(GPIO.BCM)
+   GPIO.setup([m11, m12, m21, m22], GPIO.OUT, initial=GPIO.LOW)
+
+   @app.route("/")
+   def index():
+       return render_template('robot.html')
+
+   @app.route('/left_side')
+   def left_side():
+       GPIO.output([m21], GPIO.HIGH)
+       return 'true'
+
+   @app.route('/right_side')
+   def right_side():
+       GPIO.output([m11], GPIO.HIGH)
+       return 'true'
+
+   @app.route('/up_side')
+   def up_side():
+       GPIO.output([m11, m21], GPIO.HIGH)
+       return 'true'
+
+   @app.route('/down_side')
+   def down_side():
+       GPIO.output([m12, m22], GPIO.HIGH)
+       return 'true'
+
+   @app.route('/stop')
+   def stop():
+       GPIO.output([m11, m12, m21, m22], GPIO.LOW)
+       return 'true'
+
+   if __name__ == "__main__":
+       app.run(host='0.0.0.0', port=5010)
+   ```
+
+4. **Run the Python Script:**
+   ```bash
+   python robot.py
+   ```
+
+5. **Control the Robot:**
+   Open `http://<Pi_IP>:5010` in a browser to see the control interface and live video feed.
+
+### Circuit Diagram
+Connect the DC motors to the L293D motor driver IC and then to the GPIO pins of the Raspberry Pi as per the connections defined in the Python script.
+
+### Troubleshooting
+- **Camera Not Working:** Ensure the camera is enabled via `sudo raspi-config` and test it with `raspistill -o cam.jpg`.
+- **HTML File:** Ensure the `robot.html` is in the `templates` folder relative to the Python script.
+
+By following these steps, you can build a functional surveillance robotic car with live video streaming and control over the internet.
